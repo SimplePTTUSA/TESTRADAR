@@ -299,26 +299,20 @@ selectRadar(site, forceReload = false) {
   if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
   this.selectedRadar = site;
 
-  // Remove all previous radar overlays and clear animation
+  // Remove previous overlays and clear animation
+  if (this.animationTimer) clearInterval(this.animationTimer);
   this.radarLayers.forEach(l => this.map.removeLayer(l));
   this.radarLayers = [];
-  if (this.animationTimer) clearInterval(this.animationTimer);
 
   const prod = document.getElementById('productSelect').value || "N0Q";
   const bounds = this.calculateRadarBounds(site);
-
-  // Try to load up to 10 frames for animation, but only add overlays for images that exist
-  let frameCount = 0;
-  let loadedCount = 0;
   const maxFrames = 10;
   let overlays = [];
+  let loaded = 0;
 
-  // Helper to start animation after all checked
   const startAnimation = () => {
-    // Remove any overlays that failed to load
     overlays = overlays.filter(Boolean);
     if (overlays.length === 0) {
-      // No frames loaded, show fallback (national radar)
       this.loadNationalRadar();
       return;
     }
@@ -337,7 +331,6 @@ selectRadar(site, forceReload = false) {
     this.map.setView([site.lat, site.lon], 8);
   };
 
-  // Try to load each frame image, only add overlays for those that exist
   for (let i = 0; i < maxFrames; i++) {
     const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
     const img = new window.Image();
@@ -349,18 +342,18 @@ selectRadar(site, forceReload = false) {
       });
       layer.addTo(this.map);
       overlays[i] = layer;
-      loadedCount++;
-      if (loadedCount === maxFrames) startAnimation();
+      loaded++;
+      if (loaded === maxFrames) startAnimation();
     };
     img.onerror = () => {
       overlays[i] = null;
-      loadedCount++;
-      if (loadedCount === maxFrames) startAnimation();
+      loaded++;
+      if (loaded === maxFrames) startAnimation();
     };
     img.src = url;
-    frameCount++;
   }
 }
+
 
 
 
