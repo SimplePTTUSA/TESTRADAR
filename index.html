@@ -22,15 +22,28 @@
     <div class="controls-group">
       <label class="form-label" for="productSelect">Radar Product</label>
       <select id="productSelect" class="form-control">
-        <option value="nexrad-n0q">Base Reflectivity</option>
-        <option value="nexrad-n0r">Composite Reflectivity</option>
-        <option value="nexrad-n0u">Base Velocity</option>
+        <option value="nexrad-n0q">Base Reflectivity (N0Q)</option>
+        <option value="nexrad-n0r">Composite Reflectivity (N0R)</option>
+        <option value="nexrad-n0u">Base Velocity (N0U)</option>
+        <option value="nexrad-n0s">Storm Relative Motion (N0S)</option>
+        <option value="nexrad-net">Echo Tops (NET)</option>
+        <option value="nexrad-nvl">Vertically Integrated Liquid (NVL)</option>
+        <option value="nexrad-n1p">1-Hour Precipitation (N1P)</option>
+        <option value="nexrad-ntp">Storm Total Precipitation (NTP)</option>
       </select>
     </div>
     <div class="controls-group">
-      <label class="form-label" for="opacitySlider">Radar Opacity</label>
-      <input type="range" min="10" max="100" value="70" id="opacitySlider" class="slider" />
-      <span id="opacityValue">70%</span>
+      <label class="form-label" for="vcpSelect">VCP Pattern</label>
+      <select id="vcpSelect" class="form-control">
+        <option value="VCP11">VCP 11 (Precipitation - 14 tilts)</option>
+        <option value="VCP21">VCP 21 (Precipitation - 9 tilts)</option>
+        <option value="VCP31">VCP 31 (Clear Air - 5 tilts)</option>
+        <option value="VCP32">VCP 32 (Clear Air - 5 tilts)</option>
+      </select>
+    </div>
+    <div class="controls-group">
+      <label class="form-label" for="tiltSelect">Tilt Angle</label>
+      <select id="tiltSelect" class="form-control"></select>
     </div>
     <div class="controls-group checkbox-group">
       <label class="checkbox-label">
@@ -47,7 +60,19 @@
       </label>
     </div>
     <div class="controls-group">
+      <label class="form-label" for="opacitySlider">Radar Opacity</label>
+      <input type="range" min="10" max="100" value="70" id="opacitySlider" class="slider" />
+      <span id="opacityValue">70%</span>
+    </div>
+    <div class="controls-group flex-row">
       <button id="refreshBtn" class="btn btn--primary">Refresh Data</button>
+      <button id="animateBtn" class="btn btn--primary" title="Play/Pause Animation">⏯️ Animate</button>
+      <label class="form-label" for="speedSelect" style="margin-left:8px;">Speed</label>
+      <select id="speedSelect" class="form-control" style="width:70px;">
+        <option value="500">Fast</option>
+        <option value="800" selected>Normal</option>
+        <option value="1300">Slow</option>
+      </select>
     </div>
   </div>
   <div class="map-container">
