@@ -129,14 +129,13 @@ const NEXRAD_SITES = [
 class WeatherRadarApp {
   constructor() {
     this.map = null;
-    this.radarLayers = [];
+    this.radarLayer = null; // only one overlay at a time
     this.warningLayers = {
       tornado: L.layerGroup(),
       severe: L.layerGroup(),
       mesocyclone: L.layerGroup()
     };
     this.selectedRadar = null;
-    this.animationTimer = null;
     this.init();
   }
 
@@ -207,18 +206,6 @@ class WeatherRadarApp {
       option.textContent = prod.name;
       select.appendChild(option);
     });
-    this.populateTiltSelect(available[0]?.tilts || [0.5]);
-  }
-
-  populateTiltSelect(tilts) {
-    const tiltSelect = document.getElementById('tiltSelect');
-    tiltSelect.innerHTML = '';
-    tilts.forEach((tilt, idx) => {
-      const option = document.createElement('option');
-      option.value = idx;
-      option.textContent = `${tilt}°`;
-      tiltSelect.appendChild(option);
-    });
   }
 
   setupEventListeners() {
@@ -236,17 +223,12 @@ class WeatherRadarApp {
         this.loadNationalRadar();
       }
     });
-    document.getElementById('productSelect').addEventListener('change', (e) => {
-      const prod = RADAR_PRODUCTS.find(p => p.id === e.target.value);
-      this.populateTiltSelect(prod ? prod.tilts : [0.5]);
-      if (this.selectedRadar) this.selectRadar(this.selectedRadar, true);
-    });
-    document.getElementById('tiltSelect').addEventListener('change', () => {
+    document.getElementById('productSelect').addEventListener('change', () => {
       if (this.selectedRadar) this.selectRadar(this.selectedRadar, true);
     });
     document.getElementById('opacitySlider').addEventListener('input', (e) => {
       document.getElementById('opacityValue').textContent = `${e.target.value}%`;
-      this.radarLayers.forEach(layer => layer.setOpacity(e.target.value / 100));
+      if (this.radarLayer) this.radarLayer.setOpacity(e.target.value / 100);
     });
     document.getElementById('refreshBtn').addEventListener('click', () => {
       this.loadWarnings();
@@ -269,57 +251,35 @@ class WeatherRadarApp {
 
   loadNationalRadar() {
     this.selectedRadar = null;
-    if (this.animationTimer) clearInterval(this.animationTimer);
-    this.radarLayers.forEach(l => this.map.removeLayer(l));
-    this.radarLayers = [];
-    for (let i = 0; i < 11; i++) {
-      const timestamp = [
-        '900913-m50m','900913-m45m','900913-m40m','900913-m35m','900913-m30m',
-        '900913-m25m','900913-m20m','900913-m15m','900913-m10m','900913-m05m','900913'
-      ][i];
-      const layer = L.tileLayer(`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-${timestamp}/{z}/{x}/{y}.png`, {
-        opacity: document.getElementById('opacitySlider').value / 100,
-        zIndex: 200
-      });
-      layer.addTo(this.map);
-      this.radarLayers.push(layer);
+    if (this.radarLayer) {
+      this.map.removeLayer(this.radarLayer);
+      this.radarLayer = null;
     }
-    let idx = 0;
-    this.animationTimer = setInterval(() => {
-      this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
-      idx = (idx + 1) % this.radarLayers.length;
-    }, 800);
+    const timestamp = '900913'; // latest timestamp for demo
+    const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-${timestamp}/{z}/{x}/{y}.png`;
+    this.radarLayer = L.tileLayer(url, {
+      opacity: document.getElementById('opacitySlider').value / 100,
+      zIndex: 200
+    });
+    this.radarLayer.addTo(this.map);
     this.map.setView([39.8283, -98.5795], 4);
   }
 
   selectRadar(site, forceReload = false) {
     if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
     this.selectedRadar = site;
-    if (this.animationTimer) clearInterval(this.animationTimer);
-    this.radarLayers.forEach(l => this.map.removeLayer(l));
-    this.radarLayers = [];
+    if (this.radarLayer) {
+      this.map.removeLayer(this.radarLayer);
+      this.radarLayer = null;
+    }
     const prod = document.getElementById('productSelect').value || "N0Q";
     const bounds = this.calculateRadarBounds(site);
-    const maxFrames = 10;
-    for (let i = 0; i < maxFrames; i++) {
-      const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
-      const layer = L.imageOverlay(url, bounds, {
-        opacity: 0,
-        zIndex: 200
-      });
-      layer.addTo(this.map);
-      this.radarLayers.push(layer);
-    }
-    let idx = 0;
-    this.animationTimer = setInterval(() => {
-      this.radarLayers.forEach((layer, i) =>
-        layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0)
-      );
-      idx = (idx + 1) % this.radarLayers.length;
-    }, 800);
-    this.radarLayers.forEach((layer, i) =>
-      layer.setOpacity(i === 0 ? document.getElementById('opacitySlider').value / 100 : 0)
-    );
+    const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_0.png`;
+    this.radarLayer = L.imageOverlay(url, bounds, {
+      opacity: document.getElementById('opacitySlider').value / 100,
+      zIndex: 200
+    });
+    this.radarLayer.addTo(this.map);
     this.map.setView([site.lat, site.lon], 8);
   }
 
@@ -333,7 +293,6 @@ class WeatherRadarApp {
 
   async loadWarnings() {
     Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
-    // Tornado/Severe polygons: NWS API
     try {
       const resp = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert&event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
       const data = await resp.json();
@@ -342,35 +301,32 @@ class WeatherRadarApp {
           if (!feature.geometry || !feature.geometry.coordinates) continue;
           const coords = feature.geometry.coordinates;
           const type = feature.properties.event;
+          let poly;
           if (feature.geometry.type === "Polygon") {
-            const poly = L.polygon(coords, {
+            poly = L.polygon(coords, {
               fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
               fillOpacity: 0.3,
               color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
               weight: 2,
               className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
             });
+          } else if (feature.geometry.type === "MultiPolygon") {
+            poly = L.polygon(coords.flat(), {
+              fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              fillOpacity: 0.3,
+              color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              weight: 2,
+              className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
+            });
+          }
+          if (poly) {
             poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
             if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
             else this.warningLayers.severe.addLayer(poly);
-          } else if (feature.geometry.type === "MultiPolygon") {
-            coords.forEach(polygonCoords => {
-              const poly = L.polygon(polygonCoords, {
-                fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
-                fillOpacity: 0.3,
-                color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
-                weight: 2,
-                className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
-              });
-              poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
-              if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
-              else this.warningLayers.severe.addLayer(poly);
-            });
           }
         }
       }
     } catch (e) {}
-    // Mesoscale Discussions (SPC MCDs): fetch live from NOAA MapServer, draw polygons, link to discussion
     try {
       const mcdResp = await fetch('https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/spc_mesoscale_discussion/MapServer/0/query?where=1=1&outFields=*&f=geojson');
       const mcdData = await mcdResp.json();
