@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
-<body>
+<body data-color-scheme="light">
   <header class="header">
     <h1 class="header__title">Developed and Released by ®SKYWARN NATIONAL 2025</h1>
   </header>
@@ -28,15 +28,6 @@
       <select id="tiltSelect" class="form-control"></select>
     </div>
     <div class="controls-group">
-      <label class="form-label" for="mapTypeSelect">Map Type</label>
-      <select id="mapTypeSelect" class="form-control">
-        <option value="osm">Standard</option>
-        <option value="satellite">Satellite</option>
-        <option value="terrain">Terrain</option>
-        <option value="dark">Dark</option>
-      </select>
-    </div>
-    <div class="controls-group">
       <label class="form-label" for="opacitySlider">Radar Opacity</label>
       <input type="range" min="10" max="100" value="70" id="opacitySlider" class="slider" />
       <span id="opacityValue">70%</span>
@@ -53,14 +44,6 @@
       <label class="checkbox-label">
         <input type="checkbox" id="mesocycloneDiscussions" checked />
         <span class="warning-dot mesocyclone"></span> Mesoscale Discussions
-      </label>
-      <label class="checkbox-label">
-        <input type="checkbox" id="stormReports" checked />
-        <span class="warning-dot stormreport"></span> Storm Reports
-      </label>
-      <label class="checkbox-label">
-        <input type="checkbox" id="spcOutlook" checked />
-        <span class="warning-dot spcoutlook"></span> SPC Severe Outlook
       </label>
     </div>
     <div class="controls-group">
@@ -79,8 +62,6 @@
       <div class="legend__item"><span class="legend__color tornado"></span> Tornado Warning</div>
       <div class="legend__item"><span class="legend__color severe"></span> Severe T-Storm Warning</div>
       <div class="legend__item"><span class="legend__color mesocyclone"></span> Mesoscale Discussion</div>
-      <div class="legend__item"><span class="legend__color stormreport"></span> Storm Report</div>
-      <div class="legend__item"><span class="legend__color spcoutlook"></span> SPC Severe Outlook</div>
     </div>
   </div>
   <script src="app.js"></script>
