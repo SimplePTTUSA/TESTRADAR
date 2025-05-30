@@ -116,39 +116,45 @@ const NEXRAD_SITES = [
 ];
 
 
+const RADAR_PRODUCTS = [
+  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5] }
+];
+
 class WeatherRadarApp {
   constructor() {
     this.map = null;
-    this.radarLayer = null;
+    this.radarLayers = [];
     this.warningLayers = {
       tornado: L.layerGroup(),
       severe: L.layerGroup(),
       mesocyclone: L.layerGroup()
     };
-    this.siteMarkers = [];
+    this.selectedRadar = null;
     this.init();
   }
 
   init() {
     this.initMap();
-    this.addRadarMarkers();
-    this.loadNationalRadar();
+    this.populateRadarSelect();
+    this.populateProductSelect();
+    this.setupEventListeners();
     this.loadWarnings();
+    this.loadNationalRadar();
     setInterval(() => this.loadWarnings(), 60000);
     document.body.setAttribute('data-color-scheme', 'light');
   }
 
   initMap() {
     this.map = L.map('map', { zoomControl: true }).setView([39.8283, -98.5795], 4);
-    // OSM as base map
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map);
-    // Add warning layers
     Object.values(this.warningLayers).forEach(layer => layer.addTo(this.map));
+    this.addRadarMarkers();
   }
 
   addRadarMarkers() {
+    this.radarMarkers = {};
     NEXRAD_SITES.forEach(site => {
       const marker = L.circleMarker([site.lat, site.lon], {
         radius: 5,
@@ -160,30 +166,129 @@ class WeatherRadarApp {
       });
       marker.bindPopup(`<strong>${site.id}</strong><br>${site.name}`);
       marker.on('click', () => {
-        this.map.setView([site.lat, site.lon], 8);
+        document.getElementById('radarSelect').value = site.id;
+        this.populateProductSelect(site.id);
+        this.selectRadar(site, true);
       });
       marker.addTo(this.map);
-      this.siteMarkers.push(marker);
+      this.radarMarkers[site.id] = marker;
+    });
+  }
+
+  populateRadarSelect() {
+    const select = document.getElementById('radarSelect');
+    select.innerHTML = '<option value="">National Composite</option>';
+    NEXRAD_SITES.forEach(site => {
+      const option = document.createElement('option');
+      option.value = site.id;
+      option.textContent = `${site.id} - ${site.name}`;
+      select.appendChild(option);
+    });
+  }
+
+  populateProductSelect(siteId = null) {
+    const select = document.getElementById('productSelect');
+    select.innerHTML = '';
+    RADAR_PRODUCTS.forEach(prod => {
+      const option = document.createElement('option');
+      option.value = prod.id;
+      option.textContent = prod.name;
+      select.appendChild(option);
+    });
+    this.populateTiltSelect(RADAR_PRODUCTS[0].tilts);
+  }
+
+  populateTiltSelect(tilts) {
+    const tiltSelect = document.getElementById('tiltSelect');
+    tiltSelect.innerHTML = '';
+    tilts.forEach((tilt, idx) => {
+      const option = document.createElement('option');
+      option.value = idx;
+      option.textContent = `${tilt}°`;
+      tiltSelect.appendChild(option);
+    });
+  }
+
+  setupEventListeners() {
+    document.getElementById('radarSelect').addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val) {
+        const site = NEXRAD_SITES.find(s => s.id === val);
+        if (site) {
+          this.populateProductSelect(site.id);
+          this.selectRadar(site, true);
+        }
+      } else {
+        this.selectedRadar = null;
+        this.populateProductSelect();
+        this.loadNationalRadar();
+      }
+    });
+    document.getElementById('productSelect').addEventListener('change', () => {
+      if (this.selectedRadar) this.selectRadar(this.selectedRadar, true);
+    });
+    document.getElementById('tiltSelect').addEventListener('change', () => {
+      if (this.selectedRadar) this.selectRadar(this.selectedRadar, true);
+    });
+    document.getElementById('opacitySlider').addEventListener('input', (e) => {
+      document.getElementById('opacityValue').textContent = `${e.target.value}%`;
+      this.radarLayers.forEach(layer => layer.setOpacity(e.target.value / 100));
+    });
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      this.loadWarnings();
+      if (!this.selectedRadar) {
+        this.loadNationalRadar();
+      } else {
+        this.selectRadar(this.selectedRadar, true);
+      }
+    });
+    document.getElementById('tornadoWarnings').addEventListener('change', (e) => {
+      this.toggleWarningLayer('tornado', e.target.checked);
+    });
+    document.getElementById('severeWarnings').addEventListener('change', (e) => {
+      this.toggleWarningLayer('severe', e.target.checked);
+    });
+    document.getElementById('mesocycloneDiscussions').addEventListener('change', (e) => {
+      this.toggleWarningLayer('mesocyclone', e.target.checked);
     });
   }
 
   loadNationalRadar() {
-    // Remove previous radar overlay
-    if (this.radarLayer) {
-      this.map.removeLayer(this.radarLayer);
-    }
-    // Add Iowa State Mesonet radar overlay (transparent)
+    this.selectedRadar = null;
+    this.radarLayers.forEach(l => this.map.removeLayer(l));
+    this.radarLayers = [];
     const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
-    this.radarLayer = L.tileLayer(url, {
-      opacity: 0.7,
+    const layer = L.tileLayer(url, {
+      opacity: document.getElementById('opacitySlider')
+        ? document.getElementById('opacitySlider').value / 100
+        : 0.7,
       zIndex: 200
     });
-    this.radarLayer.addTo(this.map);
+    layer.addTo(this.map);
+    this.radarLayers.push(layer);
+    this.map.setView([39.8283, -98.5795], 4);
+  }
+
+  selectRadar(site, forceReload = false) {
+    if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
+    this.selectedRadar = site;
+    this.radarLayers.forEach(l => this.map.removeLayer(l));
+    this.radarLayers = [];
+    const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
+    const layer = L.tileLayer(url, {
+      opacity: document.getElementById('opacitySlider')
+        ? document.getElementById('opacitySlider').value / 100
+        : 0.7,
+      zIndex: 200
+    });
+    layer.addTo(this.map);
+    this.radarLayers.push(layer);
+    this.map.setView([site.lat, site.lon], 8);
   }
 
   async loadWarnings() {
     Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
-    // Severe thunderstorm and tornado warnings
+    // Tornado/Severe polygons: NWS API
     try {
       const resp = await fetch('https://api.weather.gov/alerts/active?event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
       const data = await resp.json();
@@ -202,9 +307,9 @@ class WeatherRadarApp {
             // Convert [lon, lat] to [lat, lon] for Leaflet
             const latlngs = polyCoords.map(ring => ring.map(([lon, lat]) => [lat, lon]));
             const poly = L.polygon(latlngs, {
-              fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              fillColor: type === "Tornado Warning" ? '#dc2626' : '#ffe600',
               fillOpacity: 0.3,
-              color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              color: type === "Tornado Warning" ? '#dc2626' : '#ffe600',
               weight: 2
             });
             poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
@@ -248,9 +353,20 @@ class WeatherRadarApp {
       console.error("SPC MCD fetch error:", e);
     }
   }
+
+  toggleWarningLayer(type, show) {
+    if (show) {
+      if (!this.map.hasLayer(this.warningLayers[type])) {
+        this.warningLayers[type].addTo(this.map);
+      }
+    } else {
+      if (this.map.hasLayer(this.warningLayers[type])) {
+        this.map.removeLayer(this.warningLayers[type]);
+      }
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   window.radarApp = new WeatherRadarApp();
 });
-
