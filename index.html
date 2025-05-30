@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SKYWARN National Weather Radar</title>
+  <title>SKYWARN Radar</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -18,33 +18,6 @@
       <select id="radarSelect" class="form-control">
         <option value="">National Composite</option>
       </select>
-    </div>
-    <div class="controls-group">
-      <label class="form-label" for="productSelect">Radar Product</label>
-      <select id="productSelect" class="form-control">
-        <option value="N0Q">Base Reflectivity</option>
-        <option value="N0R">Composite Reflectivity</option>
-        <option value="N0U">Base Velocity</option>
-        <option value="N0S">Storm Relative Motion</option>
-        <option value="NCR">Composite Reflectivity (Legacy)</option>
-        <option value="NET">Echo Tops</option>
-        <option value="NVL">Vertically Integrated Liquid</option>
-        <option value="N1P">1-Hour Precipitation</option>
-        <option value="NTP">Storm Total Precipitation</option>
-      </select>
-    </div>
-    <div class="controls-group">
-      <label class="form-label" for="vcpSelect">VCP Pattern</label>
-      <select id="vcpSelect" class="form-control">
-        <option value="VCP11">VCP 11 (Precipitation - 14 tilts)</option>
-        <option value="VCP21">VCP 21 (Precipitation - 9 tilts)</option>
-        <option value="VCP31">VCP 31 (Clear Air - 5 tilts)</option>
-        <option value="VCP32">VCP 32 (Clear Air - 5 tilts)</option>
-      </select>
-    </div>
-    <div class="controls-group">
-      <label class="form-label" for="tiltSelect">Tilt Angle</label>
-      <select id="tiltSelect" class="form-control"></select>
     </div>
     <div class="controls-group checkbox-group">
       <label class="checkbox-label">
