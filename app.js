@@ -294,38 +294,32 @@ class WeatherRadarApp {
   }
 
   // Single-site NEXRAD Ridge2 overlays (animated)
-  selectRadar(site, forceReload=false) {
-    if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
-    this.selectedRadar = site;
-    this.radarLayers.forEach(l => this.map.removeLayer(l));
-    this.radarLayers = [];
-    const prod = document.getElementById('productSelect').value || "N0Q";
-    const bounds = this.calculateRadarBounds(site);
-    for (let i = 0; i < 11; i++) {
-      const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
-      const layer = L.imageOverlay(url, bounds, {
-        opacity: document.getElementById('opacitySlider').value / 100,
-        zIndex: 200
-      });
-      layer.addTo(this.map);
-      this.radarLayers.push(layer);
-    }
-    let idx = 0;
-    if (this.animationTimer) clearInterval(this.animationTimer);
-    this.animationTimer = setInterval(() => {
-      this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
-      idx = (idx + 1) % this.radarLayers.length;
-    }, 800);
-    this.map.setView([site.lat, site.lon], 8);
+  // Single-site NEXRAD Ridge2 overlays (animated)
+selectRadar(site, forceReload=false) {
+  if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
+  this.selectedRadar = site;
+  this.radarLayers.forEach(l => this.map.removeLayer(l));
+  this.radarLayers = [];
+  const prod = document.getElementById('productSelect').value || "N0Q";
+  const bounds = this.calculateRadarBounds(site);
+  for (let i = 0; i < 11; i++) {
+    const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
+    const layer = L.imageOverlay(url, bounds, {
+      opacity: document.getElementById('opacitySlider').value / 100,
+      zIndex: 200
+    });
+    layer.addTo(this.map);
+    this.radarLayers.push(layer);
   }
+  let idx = 0;
+  if (this.animationTimer) clearInterval(this.animationTimer);
+  this.animationTimer = setInterval(() => {
+    this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
+    idx = (idx + 1) % this.radarLayers.length;
+  }, 800);
+  this.map.setView([site.lat, site.lon], 8);
+}
 
-  calculateRadarBounds(site) {
-    const kmToDegrees = 230 / 111.32;
-    return [
-      [site.lat - kmToDegrees, site.lon - kmToDegrees],
-      [site.lat + kmToDegrees, site.lon + kmToDegrees]
-    ];
-  }
 
   async loadWarnings() {
     Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
