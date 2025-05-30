@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="header">
-    <h1 class="header__title">SKYWARN National Weather Radar</h1>
+    <h1 class="header__title">SKYWARN Radar</h1>
   </header>
   <div class="controls-panel">
     <div class="controls-group">
@@ -22,14 +22,15 @@
     <div class="controls-group">
       <label class="form-label" for="productSelect">Radar Product</label>
       <select id="productSelect" class="form-control">
-        <option value="nexrad-n0q">Base Reflectivity (N0Q)</option>
-        <option value="nexrad-n0r">Composite Reflectivity (N0R)</option>
-        <option value="nexrad-n0u">Base Velocity (N0U)</option>
-        <option value="nexrad-n0s">Storm Relative Motion (N0S)</option>
-        <option value="nexrad-net">Echo Tops (NET)</option>
-        <option value="nexrad-nvl">Vertically Integrated Liquid (NVL)</option>
-        <option value="nexrad-n1p">1-Hour Precipitation (N1P)</option>
-        <option value="nexrad-ntp">Storm Total Precipitation (NTP)</option>
+        <option value="N0Q">Base Reflectivity</option>
+        <option value="N0R">Composite Reflectivity</option>
+        <option value="N0U">Base Velocity</option>
+        <option value="N0S">Storm Relative Motion</option>
+        <option value="NCR">Composite Reflectivity (Legacy)</option>
+        <option value="NET">Echo Tops</option>
+        <option value="NVL">Vertically Integrated Liquid</option>
+        <option value="N1P">1-Hour Precipitation</option>
+        <option value="NTP">Storm Total Precipitation</option>
       </select>
     </div>
     <div class="controls-group">
@@ -65,14 +66,8 @@
       <span id="opacityValue">70%</span>
     </div>
     <div class="controls-group flex-row">
-      <button id="refreshBtn" class="btn btn--primary">Refresh Data</button>
+      <button id="refreshBtn" class="btn btn--primary">Refresh</button>
       <button id="animateBtn" class="btn btn--primary" title="Play/Pause Animation">⏯️ Animate</button>
-      <label class="form-label" for="speedSelect" style="margin-left:8px;">Speed</label>
-      <select id="speedSelect" class="form-control" style="width:70px;">
-        <option value="500">Fast</option>
-        <option value="800" selected>Normal</option>
-        <option value="1300">Slow</option>
-      </select>
     </div>
   </div>
   <div class="map-container">
@@ -83,7 +78,6 @@
     </div>
   </div>
   <div class="legend">
-    <h3 class="legend__title">Warning Types</h3>
     <div class="legend__items">
       <div class="legend__item"><span class="legend__color tornado"></span> Tornado Warning</div>
       <div class="legend__item"><span class="legend__color severe"></span> Severe T-Storm Warning</div>
