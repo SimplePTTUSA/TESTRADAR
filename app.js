@@ -1,8 +1,7 @@
 // SKYWARN National Weather Radar - Light Theme, All NEXRAD, Live Polygons, Modern UI
 
 // Radar products and tilts (Level III, common)
-const RADAR_PRODUCTS = [
-  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
+{ id: "N0Q", name: "Base Reflectivity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
   { id: "NCR", name: "Composite Reflectivity", tilts: [0.5,1.5,2.4,3.4,4.3,6.0,9.9,14.6,19.5] },
   { id: "N0U", name: "Base Velocity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
   { id: "N0S", name: "Storm Relative Motion", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
@@ -144,7 +143,7 @@ class WeatherRadarApp {
   init() {
     this.initMap();
     this.populateRadarSelect();
-    this.populateProductSelect();
+    this.populateProductSelect(); // Always populate on load
     this.setupEventListeners();
     this.loadWarnings();
     this.loadNationalRadar();
@@ -185,6 +184,7 @@ class WeatherRadarApp {
 
   populateRadarSelect() {
     const select = document.getElementById('radarSelect');
+    select.innerHTML = '<option value="">National Composite</option>';
     NEXRAD_SITES.forEach(site => {
       const option = document.createElement('option');
       option.value = site.id;
@@ -198,8 +198,10 @@ class WeatherRadarApp {
     select.innerHTML = '';
     let available = RADAR_PRODUCTS;
     if (siteId) {
-      const site = NEXRAD_SITES.find(s => s.id === siteId);
-      if (site) available = RADAR_PRODUCTS.filter(p => site.products.includes(p.id));
+      // Optionally: filter by site.products if you have per-site product info
+      // For now, all products available for all sites
+      // const site = NEXRAD_SITES.find(s => s.id === siteId);
+      // if (site && site.products) available = RADAR_PRODUCTS.filter(p => site.products.includes(p.id));
     }
     available.forEach(prod => {
       const option = document.createElement('option');
@@ -270,6 +272,7 @@ class WeatherRadarApp {
   // National composite (animated, Iowa State Mesonet)
   loadNationalRadar() {
     this.selectedRadar = null;
+    if (this.animationTimer) clearInterval(this.animationTimer);
     this.radarLayers.forEach(l => this.map.removeLayer(l));
     this.radarLayers = [];
     for (let i = 0; i < 11; i++) {
@@ -285,7 +288,6 @@ class WeatherRadarApp {
       this.radarLayers.push(layer);
     }
     let idx = 0;
-    if (this.animationTimer) clearInterval(this.animationTimer);
     this.animationTimer = setInterval(() => {
       this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
       idx = (idx + 1) % this.radarLayers.length;
@@ -294,93 +296,84 @@ class WeatherRadarApp {
   }
 
   // Single-site NEXRAD Ridge2 overlays (animated)
-  // Single-site NEXRAD Ridge2 overlays (animated)
-selectRadar(site, forceReload = false) {
-  if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
-  this.selectedRadar = site;
+  selectRadar(site, forceReload = false) {
+    if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
+    this.selectedRadar = site;
+    if (this.animationTimer) clearInterval(this.animationTimer);
+    this.radarLayers.forEach(l => this.map.removeLayer(l));
+    this.radarLayers = [];
+    const prod = document.getElementById('productSelect').value || "N0Q";
+    const bounds = this.calculateRadarBounds(site);
+    const maxFrames = 10;
+    let overlays = [];
+    let loaded = 0;
 
-  // Remove previous overlays and clear animation
-  if (this.animationTimer) clearInterval(this.animationTimer);
-  this.radarLayers.forEach(l => this.map.removeLayer(l));
-  this.radarLayers = [];
-
-  const prod = document.getElementById('productSelect').value || "N0Q";
-  const bounds = this.calculateRadarBounds(site);
-  const maxFrames = 10;
-  let overlays = [];
-  let loaded = 0;
-
-  const startAnimation = () => {
-    overlays = overlays.filter(Boolean);
-    if (overlays.length === 0) {
-      this.loadNationalRadar();
-      return;
-    }
-    this.radarLayers = overlays;
-    let idx = 0;
-    this.animationTimer = setInterval(() => {
+    const startAnimation = () => {
+      overlays = overlays.filter(Boolean);
+      if (overlays.length === 0) {
+        this.loadNationalRadar();
+        return;
+      }
+      this.radarLayers = overlays;
+      let idx = 0;
+      this.animationTimer = setInterval(() => {
+        this.radarLayers.forEach((layer, i) =>
+          layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0)
+        );
+        idx = (idx + 1) % this.radarLayers.length;
+      }, 800);
+      // Show the first frame immediately
       this.radarLayers.forEach((layer, i) =>
-        layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0)
+        layer.setOpacity(i === 0 ? document.getElementById('opacitySlider').value / 100 : 0)
       );
-      idx = (idx + 1) % this.radarLayers.length;
-    }, 800);
-    // Show the first frame immediately
-    this.radarLayers.forEach((layer, i) =>
-      layer.setOpacity(i === 0 ? document.getElementById('opacitySlider').value / 100 : 0)
-    );
-    this.map.setView([site.lat, site.lon], 8);
-  };
+      this.map.setView([site.lat, site.lon], 8);
+    };
 
-  for (let i = 0; i < maxFrames; i++) {
-    const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const layer = L.imageOverlay(url, bounds, {
-        opacity: 0,
-        zIndex: 200
-      });
-      layer.addTo(this.map);
-      overlays[i] = layer;
-      loaded++;
-      if (loaded === maxFrames) startAnimation();
-    };
-    img.onerror = () => {
-      overlays[i] = null;
-      loaded++;
-      if (loaded === maxFrames) startAnimation();
-    };
-    img.src = url;
+    for (let i = 0; i < maxFrames; i++) {
+      const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const layer = L.imageOverlay(url, bounds, {
+          opacity: 0,
+          zIndex: 200
+        });
+        layer.addTo(this.map);
+        overlays[i] = layer;
+        loaded++;
+        if (loaded === maxFrames) startAnimation();
+      };
+      img.onerror = () => {
+        overlays[i] = null;
+        loaded++;
+        if (loaded === maxFrames) startAnimation();
+      };
+      img.src = url;
+    }
   }
-}
 
-
-
-
+  calculateRadarBounds(site) {
+    const kmToDegrees = 230 / 111.32;
+    return [
+      [site.lat - kmToDegrees, site.lon - kmToDegrees],
+      [site.lat + kmToDegrees, site.lon + kmToDegrees]
+    ];
+  }
 
   async loadWarnings() {
-  Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
-  // Tornado/Severe polygons: NWS API
-  try {
-    const resp = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert&event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
-    const data = await resp.json();
-    if (data.features) {
-      for (const feature of data.features) {
-        if (!feature.geometry || !feature.geometry.coordinates) continue;
-        const coords = feature.geometry.coordinates;
-        const type = feature.properties.event;
-        let poly;
-        if (feature.geometry.type === "Polygon") {
-          poly = L.polygon(coords, {
-            fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
-            fillOpacity: 0.3,
-            color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
-            weight: 2,
-            className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
-          });
-        } else if (feature.geometry.type === "MultiPolygon") {
-          coords.forEach(polygonCoords => {
-            const poly = L.polygon(polygonCoords, {
+    Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
+    // Tornado/Severe polygons: NWS API
+    try {
+      const resp = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert&event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
+      const data = await resp.json();
+      if (data.features) {
+        for (const feature of data.features) {
+          if (!feature.geometry || !feature.geometry.coordinates) continue;
+          const coords = feature.geometry.coordinates;
+          const type = feature.properties.event;
+          let poly;
+          if (feature.geometry.type === "Polygon") {
+            poly = L.polygon(coords, {
               fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
               fillOpacity: 0.3,
               color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
@@ -390,40 +383,45 @@ selectRadar(site, forceReload = false) {
             poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
             if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
             else this.warningLayers.severe.addLayer(poly);
+          } else if (feature.geometry.type === "MultiPolygon") {
+            coords.forEach(polygonCoords => {
+              const poly = L.polygon(polygonCoords, {
+                fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+                fillOpacity: 0.3,
+                color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+                weight: 2,
+                className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
+              });
+              poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
+              if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
+              else this.warningLayers.severe.addLayer(poly);
+            });
+          }
+        }
+      }
+    } catch (e) {}
+    // Mesoscale Discussions (SPC MCDs): fetch live from SPC, draw polygons, link to discussion
+    try {
+      const mcdResp = await fetch('https://www.spc.noaa.gov/products/md/mdGeoJson.json');
+      const mcdData = await mcdResp.json();
+      if (mcdData.features) {
+        for (const mcd of mcdData.features) {
+          if (!mcd.geometry || !mcd.geometry.coordinates) continue;
+          const poly = L.polygon(mcd.geometry.coordinates, {
+            fillColor: '#7c3aed',
+            fillOpacity: 0.3,
+            color: '#7c3aed',
+            weight: 2,
+            className: 'mesocyclone-discussion'
           });
-          continue;
-        }
-        if (poly) {
-          poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
-          if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
-          else this.warningLayers.severe.addLayer(poly);
+          const mcdNum = mcd.properties && mcd.properties.mcdnum ? mcd.properties.mcdnum : '';
+          const mcdUrl = mcdNum ? `https://www.spc.noaa.gov/products/md/${mcdNum}.html` : 'https://www.spc.noaa.gov/products/md/';
+          poly.bindPopup(`<a href="${mcdUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">SPC Mesoscale Discussion #${mcdNum}</a>`);
+          this.warningLayers.mesocyclone.addLayer(poly);
         }
       }
-    }
-  } catch (e) {}
-  // Mesoscale Discussions (SPC MCDs): fetch live from SPC, draw polygons, link to discussion
-  try {
-    const mcdResp = await fetch('https://www.spc.noaa.gov/products/md/mdGeoJson.json');
-    const mcdData = await mcdResp.json();
-    if (mcdData.features) {
-      for (const mcd of mcdData.features) {
-        if (!mcd.geometry || !mcd.geometry.coordinates) continue;
-        const poly = L.polygon(mcd.geometry.coordinates, {
-          fillColor: '#7c3aed',
-          fillOpacity: 0.3,
-          color: '#7c3aed',
-          weight: 2,
-          className: 'mesocyclone-discussion'
-        });
-        const mcdNum = mcd.properties && mcd.properties.mcdnum ? mcd.properties.mcdnum : '';
-        const mcdUrl = mcdNum ? `https://www.spc.noaa.gov/products/md/${mcdNum}.html` : 'https://www.spc.noaa.gov/products/md/';
-        poly.bindPopup(`<a href="${mcdUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">SPC Mesoscale Discussion #${mcdNum}</a>`);
-        this.warningLayers.mesocyclone.addLayer(poly);
-      }
-    }
-  } catch (e) {}
-}
-
+    } catch (e) {}
+  }
 
   toggleWarningLayer(type, show) {
     if (show) {
@@ -440,5 +438,7 @@ selectRadar(site, forceReload = false) {
 
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+  window.radarApp = new WeatherRadarApp();
+});
   window.radarApp = new WeatherRadarApp();
 });
