@@ -1,8 +1,12 @@
-// SKYWARN National Weather Radar - Light Theme, All NEXRAD, Live Polygons, Modern UI
-
-// Radar products and tilts (Level III, common)
 const RADAR_PRODUCTS = [
-  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5] }
+  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
+  { id: "NCR", name: "Composite Reflectivity", tilts: [0.5,1.5,2.4,3.4,4.3,6.0,9.9,14.6,19.5] },
+  { id: "N0U", name: "Base Velocity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
+  { id: "N0S", name: "Storm Relative Motion", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
+  { id: "NET", name: "Echo Tops", tilts: [0.5] },
+  { id: "NVL", name: "Vertically Integrated Liquid", tilts: [0.5] },
+  { id: "N1P", name: "1-Hour Precipitation", tilts: [0.5] },
+  { id: "NTP", name: "Storm Total Precipitation", tilts: [0.5] }
 ];
 
 // All 159 NEXRAD sites (abbreviated here, fill out from [5][8][9][10])
@@ -116,10 +120,6 @@ const NEXRAD_SITES = [
 ];
 
 
-const RADAR_PRODUCTS = [
-  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5] }
-];
-
 class WeatherRadarApp {
   constructor() {
     this.map = null;
@@ -189,13 +189,21 @@ class WeatherRadarApp {
   populateProductSelect(siteId = null) {
     const select = document.getElementById('productSelect');
     select.innerHTML = '';
-    RADAR_PRODUCTS.forEach(prod => {
+    let available = RADAR_PRODUCTS;
+    if (siteId) {
+      const site = NEXRAD_SITES.find(s => s.id === siteId);
+      if (site && site.products) {
+        available = RADAR_PRODUCTS.filter(p => site.products.includes(p.id));
+      }
+    }
+    available.forEach(prod => {
       const option = document.createElement('option');
       option.value = prod.id;
       option.textContent = prod.name;
       select.appendChild(option);
     });
-    this.populateTiltSelect(RADAR_PRODUCTS[0].tilts);
+    // Show tilts for the first product by default
+    this.populateTiltSelect(available[0]?.tilts || [0.5]);
   }
 
   populateTiltSelect(tilts) {
@@ -203,7 +211,7 @@ class WeatherRadarApp {
     tiltSelect.innerHTML = '';
     tilts.forEach((tilt, idx) => {
       const option = document.createElement('option');
-      option.value = idx;
+      option.value = tilt;
       option.textContent = `${tilt}°`;
       tiltSelect.appendChild(option);
     });
@@ -224,7 +232,9 @@ class WeatherRadarApp {
         this.loadNationalRadar();
       }
     });
-    document.getElementById('productSelect').addEventListener('change', () => {
+    document.getElementById('productSelect').addEventListener('change', (e) => {
+      const prod = RADAR_PRODUCTS.find(p => p.id === e.target.value);
+      this.populateTiltSelect(prod ? prod.tilts : [0.5]);
       if (this.selectedRadar) this.selectRadar(this.selectedRadar, true);
     });
     document.getElementById('tiltSelect').addEventListener('change', () => {
@@ -257,6 +267,9 @@ class WeatherRadarApp {
     this.selectedRadar = null;
     this.radarLayers.forEach(l => this.map.removeLayer(l));
     this.radarLayers = [];
+    // Use the selected product and tilt (if you want to support it in the future)
+    const prod = document.getElementById('productSelect').value || "N0Q";
+    // For Mesonet, only N0Q is available, but keep UI logic for future expansion
     const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
     const layer = L.tileLayer(url, {
       opacity: document.getElementById('opacitySlider')
@@ -274,6 +287,9 @@ class WeatherRadarApp {
     this.selectedRadar = site;
     this.radarLayers.forEach(l => this.map.removeLayer(l));
     this.radarLayers = [];
+    // Use selected product and tilt, but Mesonet only provides N0Q
+    const prod = document.getElementById('productSelect').value || "N0Q";
+    // For Mesonet, only N0Q is available, but keep UI logic for future expansion
     const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
     const layer = L.tileLayer(url, {
       opacity: document.getElementById('opacitySlider')
