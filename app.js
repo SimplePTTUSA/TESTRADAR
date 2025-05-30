@@ -1,4 +1,4 @@
-// SKYWARN National Weather Radar - Day Theme, Full NEXRAD, Live Polygons, Modern UI
+// SKYWARN National Weather Radar - Light Theme, All NEXRAD, Live Polygons, Modern UI
 
 // Radar products and tilts (Level III, common)
 const RADAR_PRODUCTS = [
@@ -12,13 +12,13 @@ const RADAR_PRODUCTS = [
   { id: "NTP", name: "Storm Total Precipitation", tilts: [0.5] }
 ];
 
-// All 159 NEXRAD sites (abbreviated here, fill out from [3][6])
+// All 159 NEXRAD sites (abbreviated here, fill out from [5][8][9][10])
 const NEXRAD_SITES = [
   {id:"KABR",name:"Aberdeen, SD",lat:45.4558,lon:-98.4131,products:["N0Q","NCR","N0U","N0S","NET","NVL","N1P","NTP"]},
   {id:"KENX",name:"Albany, NY",lat:42.5864,lon:-74.0639,products:["N0Q","NCR","N0U","N0S","NET","NVL","N1P","NTP"]},
   {id:"KABX",name:"Albuquerque, NM",lat:35.1497,lon:-106.8239,products:["N0Q","NCR","N0U","N0S","NET","NVL","N1P","NTP"]},
   {id:"KAMA",name:"Amarillo, TX",lat:35.2333,lon:-101.7089,products:["N0Q","NCR","N0U","N0S","NET","NVL","N1P","NTP"]},
-  // ... (expand to all 159 sites from [3][6])
+  // ... (expand to all 159 sites from [5][8][9][10])
 ];
 
 class WeatherRadarApp {
@@ -28,12 +28,11 @@ class WeatherRadarApp {
     this.warningLayers = {
       tornado: L.layerGroup(),
       severe: L.layerGroup(),
-      mesocyclone: L.layerGroup(),
-      stormreport: L.layerGroup(),
-      spcoutlook: L.layerGroup()
+      mesocyclone: L.layerGroup()
     };
     this.selectedRadar = null;
-    this.baseLayers = {};
+    this.animationInterval = 800;
+    this.animationTimer = null;
     this.init();
   }
 
@@ -45,16 +44,15 @@ class WeatherRadarApp {
     this.loadWarnings();
     this.loadNationalRadar();
     setInterval(() => this.loadWarnings(), 60000);
+    // Force light theme
+    document.body.setAttribute('data-color-scheme', 'light');
   }
 
   initMap() {
-    this.baseLayers = {
-      "Standard": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }),
-      "Satellite": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: '© OpenTopoMap' }),
-      "Terrain": L.tileLayer('https://{s}.tile.stamen.com/terrain/{z}/{x}/{y}.jpg', { attribution: 'Map tiles by Stamen Design' }),
-      "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap, CartoDB' })
-    };
-    this.map = L.map('map', { zoomControl: true, layers: [this.baseLayers["Standard"]] }).setView([39.8283, -98.5795], 4);
+    this.map = L.map('map', { zoomControl: true }).setView([39.8283, -98.5795], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(this.map);
     Object.values(this.warningLayers).forEach(layer => layer.addTo(this.map));
     this.addRadarMarkers();
   }
@@ -64,7 +62,7 @@ class WeatherRadarApp {
     NEXRAD_SITES.forEach(site => {
       const marker = L.circleMarker([site.lat, site.lon], {
         radius: 5,
-        fillColor: '#32b8c6',
+        fillColor: '#21808d',
         color: '#fff',
         weight: 1,
         opacity: 1,
@@ -141,14 +139,6 @@ class WeatherRadarApp {
     document.getElementById('tiltSelect').addEventListener('change', () => {
       if (this.selectedRadar) this.selectRadar(this.selectedRadar, true);
     });
-    document.getElementById('mapTypeSelect').addEventListener('change', (e) => {
-      const val = e.target.value;
-      Object.values(this.baseLayers).forEach(l => this.map.removeLayer(l));
-      if (val === "osm") this.baseLayers["Standard"].addTo(this.map);
-      else if (val === "satellite") this.baseLayers["Satellite"].addTo(this.map);
-      else if (val === "terrain") this.baseLayers["Terrain"].addTo(this.map);
-      else if (val === "dark") this.baseLayers["Dark"].addTo(this.map);
-    });
     document.getElementById('opacitySlider').addEventListener('input', (e) => {
       document.getElementById('opacityValue').textContent = `${e.target.value}%`;
       this.radarLayers.forEach(layer => layer.setOpacity(e.target.value / 100));
@@ -170,21 +160,19 @@ class WeatherRadarApp {
     document.getElementById('mesocycloneDiscussions').addEventListener('change', (e) => {
       this.toggleWarningLayer('mesocyclone', e.target.checked);
     });
-    document.getElementById('stormReports').addEventListener('change', (e) => {
-      this.toggleWarningLayer('stormreport', e.target.checked);
-    });
-    document.getElementById('spcOutlook').addEventListener('change', (e) => {
-      this.toggleWarningLayer('spcoutlook', e.target.checked);
-    });
   }
 
-  // National composite (animated, Open-Meteo)
+  // National composite (animated, Iowa State Mesonet)
   loadNationalRadar() {
     this.selectedRadar = null;
     this.radarLayers.forEach(l => this.map.removeLayer(l));
     this.radarLayers = [];
-    for (let i = 0; i < 12; i++) {
-      const layer = L.tileLayer(`https://tile.open-meteo.com/radar/usa/{z}/{x}/{y}.png?frame=${i}`, {
+    for (let i = 0; i < 11; i++) {
+      const timestamp = [
+        '900913-m50m','900913-m45m','900913-m40m','900913-m35m','900913-m30m',
+        '900913-m25m','900913-m20m','900913-m15m','900913-m10m','900913-m05m','900913'
+      ][i];
+      const layer = L.tileLayer(`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-${timestamp}/{z}/{x}/{y}.png`, {
         opacity: document.getElementById('opacitySlider').value / 100,
         zIndex: 200
       });
@@ -192,7 +180,8 @@ class WeatherRadarApp {
       this.radarLayers.push(layer);
     }
     let idx = 0;
-    setInterval(() => {
+    if (this.animationTimer) clearInterval(this.animationTimer);
+    this.animationTimer = setInterval(() => {
       this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
       idx = (idx + 1) % this.radarLayers.length;
     }, 800);
@@ -207,7 +196,7 @@ class WeatherRadarApp {
     this.radarLayers = [];
     const prod = document.getElementById('productSelect').value || "N0Q";
     const bounds = this.calculateRadarBounds(site);
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 11; i++) {
       const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
       const layer = L.imageOverlay(url, bounds, {
         opacity: document.getElementById('opacitySlider').value / 100,
@@ -217,7 +206,8 @@ class WeatherRadarApp {
       this.radarLayers.push(layer);
     }
     let idx = 0;
-    setInterval(() => {
+    if (this.animationTimer) clearInterval(this.animationTimer);
+    this.animationTimer = setInterval(() => {
       this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
       idx = (idx + 1) % this.radarLayers.length;
     }, 800);
@@ -290,8 +280,6 @@ class WeatherRadarApp {
         }
       }
     } catch (e) {}
-    // Storm reports and SPC outlooks (demo only)
-    // Add your own live data fetch here if desired
   }
 
   toggleWarningLayer(type, show) {
