@@ -315,8 +315,10 @@ selectRadar(site, forceReload = false) {
 
   // Helper to start animation after all checked
   const startAnimation = () => {
+    // Remove any overlays that failed to load
+    overlays = overlays.filter(Boolean);
     if (overlays.length === 0) {
-      // No frames loaded, show fallback
+      // No frames loaded, show fallback (national radar)
       this.loadNationalRadar();
       return;
     }
@@ -328,6 +330,10 @@ selectRadar(site, forceReload = false) {
       );
       idx = (idx + 1) % this.radarLayers.length;
     }, 800);
+    // Show the first frame immediately
+    this.radarLayers.forEach((layer, i) =>
+      layer.setOpacity(i === 0 ? document.getElementById('opacitySlider').value / 100 : 0)
+    );
     this.map.setView([site.lat, site.lon], 8);
   };
 
@@ -342,18 +348,20 @@ selectRadar(site, forceReload = false) {
         zIndex: 200
       });
       layer.addTo(this.map);
-      overlays.push(layer);
+      overlays[i] = layer;
       loadedCount++;
-      if (loadedCount + frameCount === maxFrames) startAnimation();
+      if (loadedCount === maxFrames) startAnimation();
     };
     img.onerror = () => {
+      overlays[i] = null;
       loadedCount++;
-      if (loadedCount + frameCount === maxFrames) startAnimation();
+      if (loadedCount === maxFrames) startAnimation();
     };
     img.src = url;
     frameCount++;
   }
 }
+
 
 
 
