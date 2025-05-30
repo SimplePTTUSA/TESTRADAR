@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SKYWARN Radar</title>
+  <title>SKYWARN National Weather Radar</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 <body>
   <header class="header">
-    <h1 class="header__title">SKYWARN Radar</h1>
+    <h1 class="header__title">SKYWARN National Weather Radar</h1>
   </header>
   <div class="controls-panel">
     <div class="controls-group">
@@ -18,6 +18,27 @@
       <select id="radarSelect" class="form-control">
         <option value="">National Composite</option>
       </select>
+    </div>
+    <div class="controls-group">
+      <label class="form-label" for="productSelect">Radar Product</label>
+      <select id="productSelect" class="form-control"></select>
+    </div>
+    <div class="controls-group">
+      <label class="form-label" for="tiltSelect">Tilt Angle</label>
+      <select id="tiltSelect" class="form-control"></select>
+    </div>
+    <div class="controls-group">
+      <label class="form-label" for="animationSpeed">Animation Speed</label>
+      <select id="animationSpeed" class="form-control">
+        <option value="400">Fast</option>
+        <option value="800" selected>Normal</option>
+        <option value="1300">Slow</option>
+      </select>
+    </div>
+    <div class="controls-group">
+      <label class="form-label" for="opacitySlider">Radar Opacity</label>
+      <input type="range" min="10" max="100" value="70" id="opacitySlider" class="slider" />
+      <span id="opacityValue">70%</span>
     </div>
     <div class="controls-group checkbox-group">
       <label class="checkbox-label">
@@ -30,13 +51,8 @@
       </label>
       <label class="checkbox-label">
         <input type="checkbox" id="mesocycloneDiscussions" checked />
-        <span class="warning-dot mesocyclone"></span> Mesocyclone Discussions
+        <span class="warning-dot mesocyclone"></span> Mesoscale Discussions
       </label>
-    </div>
-    <div class="controls-group">
-      <label class="form-label" for="opacitySlider">Radar Opacity</label>
-      <input type="range" min="10" max="100" value="70" id="opacitySlider" class="slider" />
-      <span id="opacityValue">70%</span>
     </div>
     <div class="controls-group flex-row">
       <button id="refreshBtn" class="btn btn--primary">Refresh</button>
@@ -54,7 +70,7 @@
     <div class="legend__items">
       <div class="legend__item"><span class="legend__color tornado"></span> Tornado Warning</div>
       <div class="legend__item"><span class="legend__color severe"></span> Severe T-Storm Warning</div>
-      <div class="legend__item"><span class="legend__color mesocyclone"></span> Mesocyclone Discussion</div>
+      <div class="legend__item"><span class="legend__color mesocyclone"></span> Mesoscale Discussion</div>
     </div>
   </div>
   <script src="app.js"></script>
