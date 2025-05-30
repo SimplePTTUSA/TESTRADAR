@@ -295,30 +295,66 @@ class WeatherRadarApp {
 
   // Single-site NEXRAD Ridge2 overlays (animated)
   // Single-site NEXRAD Ridge2 overlays (animated)
-selectRadar(site, forceReload=false) {
+selectRadar(site, forceReload = false) {
   if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
   this.selectedRadar = site;
+
+  // Remove all previous radar overlays and clear animation
   this.radarLayers.forEach(l => this.map.removeLayer(l));
   this.radarLayers = [];
+  if (this.animationTimer) clearInterval(this.animationTimer);
+
   const prod = document.getElementById('productSelect').value || "N0Q";
   const bounds = this.calculateRadarBounds(site);
-  for (let i = 0; i < 11; i++) {
+
+  // Try to load up to 10 frames for animation, but only add overlays for images that exist
+  let frameCount = 0;
+  let loadedCount = 0;
+  const maxFrames = 10;
+  let overlays = [];
+
+  // Helper to start animation after all checked
+  const startAnimation = () => {
+    if (overlays.length === 0) {
+      // No frames loaded, show fallback
+      this.loadNationalRadar();
+      return;
+    }
+    this.radarLayers = overlays;
+    let idx = 0;
+    this.animationTimer = setInterval(() => {
+      this.radarLayers.forEach((layer, i) =>
+        layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0)
+      );
+      idx = (idx + 1) % this.radarLayers.length;
+    }, 800);
+    this.map.setView([site.lat, site.lon], 8);
+  };
+
+  // Try to load each frame image, only add overlays for those that exist
+  for (let i = 0; i < maxFrames; i++) {
     const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_${i}.png`;
-    const layer = L.imageOverlay(url, bounds, {
-      opacity: document.getElementById('opacitySlider').value / 100,
-      zIndex: 200
-    });
-    layer.addTo(this.map);
-    this.radarLayers.push(layer);
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const layer = L.imageOverlay(url, bounds, {
+        opacity: 0,
+        zIndex: 200
+      });
+      layer.addTo(this.map);
+      overlays.push(layer);
+      loadedCount++;
+      if (loadedCount + frameCount === maxFrames) startAnimation();
+    };
+    img.onerror = () => {
+      loadedCount++;
+      if (loadedCount + frameCount === maxFrames) startAnimation();
+    };
+    img.src = url;
+    frameCount++;
   }
-  let idx = 0;
-  if (this.animationTimer) clearInterval(this.animationTimer);
-  this.animationTimer = setInterval(() => {
-    this.radarLayers.forEach((layer, i) => layer.setOpacity(i === idx ? document.getElementById('opacitySlider').value / 100 : 0));
-    idx = (idx + 1) % this.radarLayers.length;
-  }, 800);
-  this.map.setView([site.lat, site.lon], 8);
 }
+
 
 
   async loadWarnings() {
