@@ -359,64 +359,71 @@ selectRadar(site, forceReload = false) {
 
 
   async loadWarnings() {
-    Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
-    // Tornado/Severe polygons: NWS API
-    try {
-      const resp = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert&event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
-      const data = await resp.json();
-      if (data.features) {
-        for (const feature of data.features) {
-          if (!feature.geometry || !feature.geometry.coordinates) continue;
-          const coords = feature.geometry.coordinates;
-          const type = feature.properties.event;
-          let poly;
-          if (feature.geometry.type === "Polygon") {
-            poly = L.polygon(coords, {
+  Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
+  // Tornado/Severe polygons: NWS API
+  try {
+    const resp = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert&event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
+    const data = await resp.json();
+    if (data.features) {
+      for (const feature of data.features) {
+        if (!feature.geometry || !feature.geometry.coordinates) continue;
+        const coords = feature.geometry.coordinates;
+        const type = feature.properties.event;
+        let poly;
+        if (feature.geometry.type === "Polygon") {
+          poly = L.polygon(coords, {
+            fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+            fillOpacity: 0.3,
+            color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+            weight: 2,
+            className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
+          });
+        } else if (feature.geometry.type === "MultiPolygon") {
+          coords.forEach(polygonCoords => {
+            const poly = L.polygon(polygonCoords, {
               fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
               fillOpacity: 0.3,
               color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
               weight: 2,
               className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
             });
-          } else if (feature.geometry.type === "MultiPolygon") {
-            poly = L.polygon(coords.flat(), {
-              fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
-              fillOpacity: 0.3,
-              color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
-              weight: 2,
-              className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
-            });
-          }
-          if (poly) {
             poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
             if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
             else this.warningLayers.severe.addLayer(poly);
-          }
-        }
-      }
-    } catch (e) {}
-    // Mesoscale Discussions (SPC MCDs): fetch live from SPC, draw polygons, link to discussion
-    try {
-      const mcdResp = await fetch('https://www.spc.noaa.gov/products/md/mdGeoJson.json');
-      const mcdData = await mcdResp.json();
-      if (mcdData.features) {
-        for (const mcd of mcdData.features) {
-          if (!mcd.geometry || !mcd.geometry.coordinates) continue;
-          const poly = L.polygon(mcd.geometry.coordinates, {
-            fillColor: '#7c3aed',
-            fillOpacity: 0.3,
-            color: '#7c3aed',
-            weight: 2,
-            className: 'mesocyclone-discussion'
           });
-          const mcdNum = mcd.properties && mcd.properties.mcdnum ? mcd.properties.mcdnum : '';
-          const mcdUrl = mcdNum ? `https://www.spc.noaa.gov/products/md/${mcdNum}.html` : 'https://www.spc.noaa.gov/products/md/';
-          poly.bindPopup(`<a href="${mcdUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">SPC Mesoscale Discussion #${mcdNum}</a>`);
-          this.warningLayers.mesocyclone.addLayer(poly);
+          continue;
+        }
+        if (poly) {
+          poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
+          if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
+          else this.warningLayers.severe.addLayer(poly);
         }
       }
-    } catch (e) {}
-  }
+    }
+  } catch (e) {}
+  // Mesoscale Discussions (SPC MCDs): fetch live from SPC, draw polygons, link to discussion
+  try {
+    const mcdResp = await fetch('https://www.spc.noaa.gov/products/md/mdGeoJson.json');
+    const mcdData = await mcdResp.json();
+    if (mcdData.features) {
+      for (const mcd of mcdData.features) {
+        if (!mcd.geometry || !mcd.geometry.coordinates) continue;
+        const poly = L.polygon(mcd.geometry.coordinates, {
+          fillColor: '#7c3aed',
+          fillOpacity: 0.3,
+          color: '#7c3aed',
+          weight: 2,
+          className: 'mesocyclone-discussion'
+        });
+        const mcdNum = mcd.properties && mcd.properties.mcdnum ? mcd.properties.mcdnum : '';
+        const mcdUrl = mcdNum ? `https://www.spc.noaa.gov/products/md/${mcdNum}.html` : 'https://www.spc.noaa.gov/products/md/';
+        poly.bindPopup(`<a href="${mcdUrl}" target="_blank" rel="noopener" style="color:#7c3aed;">SPC Mesoscale Discussion #${mcdNum}</a>`);
+        this.warningLayers.mesocyclone.addLayer(poly);
+      }
+    }
+  } catch (e) {}
+}
+
 
   toggleWarningLayer(type, show) {
     if (show) {
