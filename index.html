@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="header">
-    <h1 class="header__title">SKYWARN National Weather Radar</h1>
+    <h1 class="header__title">Developed and Released by ®SKYWARN NATIONAL 2025</h1>
   </header>
   <div class="controls-panel">
     <div class="controls-group">
@@ -28,11 +28,12 @@
       <select id="tiltSelect" class="form-control"></select>
     </div>
     <div class="controls-group">
-      <label class="form-label" for="animationSpeed">Animation Speed</label>
-      <select id="animationSpeed" class="form-control">
-        <option value="400">Fast</option>
-        <option value="800" selected>Normal</option>
-        <option value="1300">Slow</option>
+      <label class="form-label" for="mapTypeSelect">Map Type</label>
+      <select id="mapTypeSelect" class="form-control">
+        <option value="osm">Standard</option>
+        <option value="satellite">Satellite</option>
+        <option value="terrain">Terrain</option>
+        <option value="dark">Dark</option>
       </select>
     </div>
     <div class="controls-group">
@@ -53,10 +54,17 @@
         <input type="checkbox" id="mesocycloneDiscussions" checked />
         <span class="warning-dot mesocyclone"></span> Mesoscale Discussions
       </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="stormReports" checked />
+        <span class="warning-dot stormreport"></span> Storm Reports
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="spcOutlook" checked />
+        <span class="warning-dot spcoutlook"></span> SPC Severe Outlook
+      </label>
     </div>
-    <div class="controls-group flex-row">
+    <div class="controls-group">
       <button id="refreshBtn" class="btn btn--primary">Refresh</button>
-      <button id="animateBtn" class="btn btn--primary" title="Play/Pause Animation">⏯️ Animate</button>
     </div>
   </div>
   <div class="map-container">
@@ -71,6 +79,8 @@
       <div class="legend__item"><span class="legend__color tornado"></span> Tornado Warning</div>
       <div class="legend__item"><span class="legend__color severe"></span> Severe T-Storm Warning</div>
       <div class="legend__item"><span class="legend__color mesocyclone"></span> Mesoscale Discussion</div>
+      <div class="legend__item"><span class="legend__color stormreport"></span> Storm Report</div>
+      <div class="legend__item"><span class="legend__color spcoutlook"></span> SPC Severe Outlook</div>
     </div>
   </div>
   <script src="app.js"></script>
