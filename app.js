@@ -1,7 +1,7 @@
 // SKYWARN National Weather Radar - Light Theme, All NEXRAD, Live Polygons, Modern UI
 
-// Radar products and tilts (Level III, common)
-{ id: "N0Q", name: "Base Reflectivity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
+const RADAR_PRODUCTS = [
+  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
   { id: "NCR", name: "Composite Reflectivity", tilts: [0.5,1.5,2.4,3.4,4.3,6.0,9.9,14.6,19.5] },
   { id: "N0U", name: "Base Velocity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
   { id: "N0S", name: "Storm Relative Motion", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
@@ -143,12 +143,11 @@ class WeatherRadarApp {
   init() {
     this.initMap();
     this.populateRadarSelect();
-    this.populateProductSelect(); // Always populate on load
+    this.populateProductSelect();
     this.setupEventListeners();
     this.loadWarnings();
     this.loadNationalRadar();
     setInterval(() => this.loadWarnings(), 60000);
-    // Force light theme
     document.body.setAttribute('data-color-scheme', 'light');
   }
 
@@ -174,8 +173,9 @@ class WeatherRadarApp {
       });
       marker.bindPopup(`<strong>${site.id}</strong><br>${site.name}`);
       marker.on('click', () => {
-        this.selectRadar(site);
         document.getElementById('radarSelect').value = site.id;
+        this.populateProductSelect(site.id);
+        this.selectRadar(site, true);
       });
       marker.addTo(this.map);
       this.radarMarkers[site.id] = marker;
@@ -198,10 +198,8 @@ class WeatherRadarApp {
     select.innerHTML = '';
     let available = RADAR_PRODUCTS;
     if (siteId) {
-      // Optionally: filter by site.products if you have per-site product info
-      // For now, all products available for all sites
-      // const site = NEXRAD_SITES.find(s => s.id === siteId);
-      // if (site && site.products) available = RADAR_PRODUCTS.filter(p => site.products.includes(p.id));
+      const site = NEXRAD_SITES.find(s => s.id === siteId);
+      if (site && site.products) available = RADAR_PRODUCTS.filter(p => site.products.includes(p.id));
     }
     available.forEach(prod => {
       const option = document.createElement('option');
@@ -230,7 +228,7 @@ class WeatherRadarApp {
         const site = NEXRAD_SITES.find(s => s.id === val);
         if (site) {
           this.populateProductSelect(site.id);
-          this.selectRadar(site);
+          this.selectRadar(site, true);
         }
       } else {
         this.selectedRadar = null;
@@ -269,7 +267,6 @@ class WeatherRadarApp {
     });
   }
 
-  // National composite (animated, Iowa State Mesonet)
   loadNationalRadar() {
     this.selectedRadar = null;
     if (this.animationTimer) clearInterval(this.animationTimer);
@@ -295,7 +292,6 @@ class WeatherRadarApp {
     this.map.setView([39.8283, -98.5795], 4);
   }
 
-  // Single-site NEXRAD Ridge2 overlays (animated)
   selectRadar(site, forceReload = false) {
     if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
     this.selectedRadar = site;
@@ -322,7 +318,6 @@ class WeatherRadarApp {
         );
         idx = (idx + 1) % this.radarLayers.length;
       }, 800);
-      // Show the first frame immediately
       this.radarLayers.forEach((layer, i) =>
         layer.setOpacity(i === 0 ? document.getElementById('opacitySlider').value / 100 : 0)
       );
@@ -371,9 +366,8 @@ class WeatherRadarApp {
           if (!feature.geometry || !feature.geometry.coordinates) continue;
           const coords = feature.geometry.coordinates;
           const type = feature.properties.event;
-          let poly;
           if (feature.geometry.type === "Polygon") {
-            poly = L.polygon(coords, {
+            const poly = L.polygon(coords, {
               fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
               fillOpacity: 0.3,
               color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
@@ -438,7 +432,5 @@ class WeatherRadarApp {
 
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  window.radarApp = new WeatherRadarApp();
-});
   window.radarApp = new WeatherRadarApp();
 });
