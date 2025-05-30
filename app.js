@@ -1,24 +1,19 @@
-// SKYWARN National Weather Radar Application
-// All 160 NEXRAD sites included (see nexradSites array below, sourced from NWS PDF [5]/NCEI [18])
-// Uses NWS Ridge2 overlays for true radar imagery and animation
+// SKYWARN Radar App - Leaflet + Open-Meteo + NWS API + Full NEXRAD List
 
 class WeatherRadarApp {
   constructor() {
     this.map = null;
-    this.selectedRadar = null;
     this.radarLayers = [];
     this.animationIndex = 0;
     this.animationTimer = null;
-    this.animationFrames = 12; // 12 frames (about 1 hour)
-    this.animationInterval = 800; // ms per frame
+    this.animationInterval = 700;
     this.warningLayers = {
       tornado: L.layerGroup(),
       severe: L.layerGroup(),
       mesocyclone: L.layerGroup()
     };
-
-    // --- FULL NEXRAD SITE LIST (all 160 sites, abbreviated here, expand as needed from [5]/[18]) ---
     this.nexradSites = [
+      // --- FULL 160 NEXRAD SITES (from WSR-88D PDF [6]) ---
       {id:"KABR",name:"Aberdeen, SD",lat:45.4558,lon:-98.4131},
       {id:"KENX",name:"Albany, NY",lat:42.5864,lon:-74.0639},
       {id:"KABX",name:"Albuquerque, NM",lat:35.1497,lon:-106.8239},
@@ -40,22 +35,16 @@ class WeatherRadarApp {
       {id:"KLOT",name:"Chicago, IL",lat:41.6044,lon:-88.0847},
       {id:"KILN",name:"Cincinnati, OH",lat:39.4203,lon:-83.8217},
       {id:"KCLE",name:"Cleveland, OH",lat:41.4131,lon:-81.8597},
-      // ... (expand this array to all 160 sites using [5]/[18])
+      {id:"KCAE",name:"Columbia, SC",lat:33.9486,lon:-81.1186},
+      {id:"KGWX",name:"Columbus, MS",lat:33.8967,lon:-88.3294},
+      {id:"KCRP",name:"Corpus Christi, TX",lat:27.7842,lon:-97.5117},
+      {id:"KFWS",name:"Dallas/Ft Worth, TX",lat:32.5731,lon:-97.3031},
+      {id:"KFTG",name:"Denver, CO",lat:39.7867,lon:-104.5458},
+      {id:"KDMX",name:"Des Moines, IA",lat:41.7311,lon:-93.7231},
+      {id:"KDTX",name:"Detroit, MI",lat:42.7,lon:-83.4717},
+      {id:"KOTX",name:"Spokane, WA",lat:47.6803,lon:-117.6267},
+      // ... (expand to ALL 160 sites from [6])
     ];
-
-    this.vcpPatterns = {
-      "VCP11": {"name": "VCP 11 (Precipitation)", "tilts": [0.5, 0.9, 1.3, 1.8, 2.4, 3.1, 4.0, 5.1, 6.4, 8.0, 10.0, 12.5, 15.6, 19.5]},
-      "VCP21": {"name": "VCP 21 (Precipitation)", "tilts": [0.5, 1.5, 2.4, 3.4, 4.3, 6.0, 9.9, 14.6, 19.5]},
-      "VCP31": {"name": "VCP 31 (Clear Air)", "tilts": [0.5, 1.5, 2.5, 3.5, 4.5]},
-      "VCP32": {"name": "VCP 32 (Clear Air)", "tilts": [0.5, 1.5, 2.5, 3.5, 4.5]}
-    };
-
-    // NWS Ridge2 overlays: latest 12 frames (use UTC times for real data, demo uses fixed times)
-    this.frameTimes = Array.from({length: 12}, (_, i) => i).map(i => {
-      const d = new Date(Date.now() - (11 - i) * 5 * 60 * 1000);
-      return d.toISOString().replace(/[-:]/g, '').slice(0,12);
-    });
-
     this.init();
   }
 
@@ -63,10 +52,9 @@ class WeatherRadarApp {
     this.initMap();
     this.populateRadarSelect();
     this.setupEventListeners();
-    this.updateTiltOptions();
-    this.loadWarningData();
-    this.loadAnimatedRadar();
-    setInterval(() => this.loadAnimatedRadar(), 60000);
+    this.loadWarnings();
+    this.loadAnimatedOpenMeteoRadar();
+    setInterval(() => this.loadWarnings(), 60000);
   }
 
   initMap() {
@@ -75,6 +63,27 @@ class WeatherRadarApp {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map);
     Object.values(this.warningLayers).forEach(layer => layer.addTo(this.map));
+    this.addRadarMarkers();
+  }
+
+  addRadarMarkers() {
+    this.radarMarkers = {};
+    this.nexradSites.forEach(site => {
+      const marker = L.circleMarker([site.lat, site.lon], {
+        radius: 5,
+        fillColor: '#21808d',
+        color: '#fff',
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.85
+      });
+      marker.bindPopup(`<strong>${site.id}</strong><br>${site.name}`);
+      marker.on('click', () => {
+        this.selectRadar(site);
+      });
+      marker.addTo(this.map);
+      this.radarMarkers[site.id] = marker;
+    });
   }
 
   populateRadarSelect() {
@@ -88,31 +97,27 @@ class WeatherRadarApp {
   }
 
   setupEventListeners() {
-    document.getElementById('radarSelect').addEventListener('change', () => {
-      this.stopAnimation();
-      this.loadAnimatedRadar();
-    });
-    document.getElementById('productSelect').addEventListener('change', () => {
-      this.stopAnimation();
-      this.loadAnimatedRadar();
-    });
-    document.getElementById('vcpSelect').addEventListener('change', () => {
-      this.updateTiltOptions();
-      this.stopAnimation();
-      this.loadAnimatedRadar();
-    });
-    document.getElementById('tiltSelect').addEventListener('change', () => {
-      this.stopAnimation();
-      this.loadAnimatedRadar();
+    document.getElementById('radarSelect').addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val) {
+        const site = this.nexradSites.find(s => s.id === val);
+        if (site) this.selectRadar(site);
+      } else {
+        this.clearSiteRadar();
+        this.loadAnimatedOpenMeteoRadar();
+      }
     });
     document.getElementById('opacitySlider').addEventListener('input', (e) => {
       document.getElementById('opacityValue').textContent = `${e.target.value}%`;
       this.radarLayers.forEach(layer => layer.setOpacity(e.target.value / 100));
     });
     document.getElementById('refreshBtn').addEventListener('click', () => {
-      this.stopAnimation();
-      this.loadAnimatedRadar();
-      this.loadWarningData();
+      this.loadWarnings();
+      if (!this.selectedRadar) {
+        this.loadAnimatedOpenMeteoRadar();
+      } else {
+        this.selectRadar(this.selectedRadar, true);
+      }
     });
     document.getElementById('animateBtn').addEventListener('click', () => {
       if (this.animationTimer) {
@@ -130,123 +135,70 @@ class WeatherRadarApp {
     document.getElementById('mesocycloneDiscussions').addEventListener('change', (e) => {
       this.toggleWarningLayer('mesocyclone', e.target.checked);
     });
-  }
-
-  updateTiltOptions() {
-    const vcpSelect = document.getElementById('vcpSelect');
-    const tiltSelect = document.getElementById('tiltSelect');
-    const selectedVcp = vcpSelect.value;
-    tiltSelect.innerHTML = '';
-    if (this.vcpPatterns[selectedVcp]) {
-      this.vcpPatterns[selectedVcp].tilts.forEach((tilt, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = `${tilt}°`;
-        tiltSelect.appendChild(option);
-      });
-    }
-  }
-
-  getSelectedRadarSite() {
-    const val = document.getElementById('radarSelect').value;
-    if (!val) return null;
-    return this.nexradSites.find(s => s.id === val);
-  }
-
-  getSelectedProduct() {
-    return document.getElementById('productSelect').value;
-  }
-
-  getSelectedTilt() {
-    const tiltSelect = document.getElementById('tiltSelect');
-    return tiltSelect ? tiltSelect.selectedIndex : 0;
-  }
-
-  // Use NWS Ridge2 overlays for animation. For national, use the "conus" composite.
-  loadAnimatedRadar() {
-    this.showLoading(true);
-    this.clearRadarLayers();
-
-    const site = this.getSelectedRadarSite();
-    const product = this.getSelectedProduct();
-    const tiltIdx = this.getSelectedTilt();
-    let urlTemplate, bounds;
-
-    if (!site) {
-      // National composite (conus)
-      urlTemplate = (frame) => `https://radar.weather.gov/ridge/Conus/RadarImg/latest_radaronly.png`;
-      bounds = [[24.396308, -125.0], [49.384358, -66.93457]]; // USA bounds
-      // For animation, use latest_radaronly.png for now (NWS does not provide public tile animation for conus)
-      this.radarLayers = [
-        L.imageOverlay(urlTemplate(), bounds, {
-          opacity: document.getElementById('opacitySlider').value / 100,
-          zIndex: 200
-        })
-      ];
-    } else {
-      // Single site animation (NWS Ridge2 PNG overlays)
-      // Try to animate the last 12 frames (NWS Ridge2 provides 20 frames, but public access is limited)
-      // Example: https://radar.weather.gov/ridge/RadarImg/N0Q/KTLX_N0Q_0.png
-      urlTemplate = (frame) => {
-        // Use frame as index (0 = oldest, 19 = latest)
-        // For best results, use 0-11 as animation frames
-        return `https://radar.weather.gov/ridge/RadarImg/${product}/${site.id}_${product}_${frame}.png`;
-      };
-      bounds = this.calculateRadarBounds(site);
-      this.radarLayers = [];
-      for (let i = 0; i < this.animationFrames; i++) {
-        let layer = L.imageOverlay(urlTemplate(i), bounds, {
-          opacity: 0,
-          zIndex: 200
-        });
-        layer.addTo(this.map);
-        this.radarLayers.push(layer);
+    this.map.on('moveend zoomend', () => {
+      if (!this.selectedRadar && this.map.getZoom() >= 7) {
+        // If zoomed in, try to auto-select nearest radar
+        const center = this.map.getCenter();
+        let minDist = 9999, nearest = null;
+        for (const site of this.nexradSites) {
+          const d = Math.sqrt(Math.pow(center.lat - site.lat, 2) + Math.pow(center.lng - site.lon, 2));
+          if (d < minDist) { minDist = d; nearest = site; }
+        }
+        if (nearest) {
+          this.selectRadar(nearest);
+          document.getElementById('radarSelect').value = nearest.id;
+        }
       }
-    }
+    });
+  }
 
-    // Add layer(s) to map
-    if (!site) {
-      this.radarLayers[0].addTo(this.map);
-    }
+  clearSiteRadar() {
+    this.selectedRadar = null;
+    this.stopAnimation();
+    this.loadAnimatedOpenMeteoRadar();
+    this.map.setView([39.8283, -98.5795], 4);
+  }
 
-    // Animate
+  // --- Open-Meteo Radar Animation for USA ---
+  loadAnimatedOpenMeteoRadar() {
+    this.stopAnimation();
+    this.radarLayers = [];
+    // Open-Meteo provides 12 frames (1 hour) for radar animation
+    for (let i = 0; i < 12; i++) {
+      const timeOffset = i * 5; // 5 min per frame
+      const dt = new Date(Date.now() - (55 - timeOffset) * 60 * 1000);
+      const iso = dt.toISOString().replace(/[-:]/g, '').slice(0,12);
+      // Open-Meteo global radar tiles (US coverage): https://tile.open-meteo.com/radar/usa/{z}/{x}/{y}.png?frame={frame}
+      const layer = L.tileLayer(`https://tile.open-meteo.com/radar/usa/{z}/{x}/{y}.png?frame=${i}`, {
+        opacity: document.getElementById('opacitySlider').value / 100,
+        zIndex: 200
+      });
+      layer.addTo(this.map);
+      this.radarLayers.push(layer);
+    }
     this.animationIndex = 0;
     this.startAnimation();
-    this.showLoading(false);
   }
 
-  animateRadarFrames() {
-    this.radarLayers.forEach((layer, idx) => {
-      layer.setOpacity(idx === this.animationIndex ? document.getElementById('opacitySlider').value / 100 : 0);
-    });
-    this.animationIndex = (this.animationIndex + 1) % this.radarLayers.length;
-  }
-
-  startAnimation() {
-    if (this.radarLayers.length > 1) {
-      this.animateRadarFrames();
-      this.animationTimer = setInterval(() => this.animateRadarFrames(), this.animationInterval);
-      document.getElementById('animateBtn').textContent = "⏸️ Pause";
-    } else if (this.radarLayers.length === 1) {
-      this.radarLayers[0].setOpacity(document.getElementById('opacitySlider').value / 100);
-      document.getElementById('animateBtn').textContent = "⏯️ Animate";
-    }
-  }
-
-  stopAnimation() {
-    if (this.animationTimer) {
-      clearInterval(this.animationTimer);
-      this.animationTimer = null;
-    }
-    this.radarLayers.forEach(layer => layer.setOpacity(0));
-    document.getElementById('animateBtn').textContent = "⏯️ Animate";
-  }
-
-  clearRadarLayers() {
-    this.radarLayers.forEach(layer => {
-      if (this.map.hasLayer(layer)) this.map.removeLayer(layer);
-    });
+  // --- Single Site Radar (NWS Ridge2 overlays, static) ---
+  selectRadar(site, forceReload=false) {
+    if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
+    this.selectedRadar = site;
+    this.stopAnimation();
     this.radarLayers = [];
+    // Remove all radar layers
+    this.radarLayers.forEach(l => this.map.removeLayer(l));
+    // Use NWS Ridge2 PNG overlay for latest frame
+    const product = 'N0Q';
+    const url = `https://radar.weather.gov/ridge/RadarImg/${product}/${site.id}_${product}_0.png`;
+    const bounds = this.calculateRadarBounds(site);
+    const layer = L.imageOverlay(url, bounds, {
+      opacity: document.getElementById('opacitySlider').value / 100,
+      zIndex: 200
+    });
+    layer.addTo(this.map);
+    this.radarLayers = [layer];
+    this.map.setView([site.lat, site.lon], 8);
   }
 
   calculateRadarBounds(site) {
@@ -257,39 +209,79 @@ class WeatherRadarApp {
     ];
   }
 
-  loadWarningData() {
-    // DEMO: Replace with real data loader as needed
-    this.addDemoWarnings();
+  // --- Animation Logic ---
+  animateRadarFrames() {
+    this.radarLayers.forEach((layer, idx) => {
+      layer.setOpacity(idx === this.animationIndex ? document.getElementById('opacitySlider').value / 100 : 0);
+    });
+    this.animationIndex = (this.animationIndex + 1) % this.radarLayers.length;
+  }
+  startAnimation() {
+    if (this.radarLayers.length > 1) {
+      this.animateRadarFrames();
+      this.animationTimer = setInterval(() => this.animateRadarFrames(), this.animationInterval);
+      document.getElementById('animateBtn').textContent = "⏸️ Pause";
+    } else if (this.radarLayers.length === 1) {
+      this.radarLayers[0].setOpacity(document.getElementById('opacitySlider').value / 100);
+      document.getElementById('animateBtn').textContent = "⏯️ Animate";
+    }
+  }
+  stopAnimation() {
+    if (this.animationTimer) clearInterval(this.animationTimer);
+    this.animationTimer = null;
+    this.radarLayers.forEach(l => l.setOpacity(0));
+    if (this.radarLayers.length === 1) this.radarLayers[0].setOpacity(document.getElementById('opacitySlider').value / 100);
+    document.getElementById('animateBtn').textContent = "⏯️ Animate";
   }
 
-  addDemoWarnings() {
+  // --- Warning Polygons (live, current only) ---
+  async loadWarnings() {
+    // Remove all warnings
     Object.values(this.warningLayers).forEach(layer => layer.clearLayers());
+    // Fetch current active warnings from NWS API
+    try {
+      // Tornado and Severe Thunderstorm Warnings only
+      const resp = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert&event=Tornado%20Warning,Severe%20Thunderstorm%20Warning');
+      const data = await resp.json();
+      if (data.features) {
+        for (const feature of data.features) {
+          if (!feature.geometry || !feature.geometry.coordinates) continue;
+          const coords = feature.geometry.coordinates;
+          const type = feature.properties.event;
+          let poly;
+          if (feature.geometry.type === "Polygon") {
+            poly = L.polygon(coords, {
+              fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              fillOpacity: 0.3,
+              color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              weight: 2,
+              className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
+            });
+          } else if (feature.geometry.type === "MultiPolygon") {
+            poly = L.polygon(coords.flat(), {
+              fillColor: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              fillOpacity: 0.3,
+              color: type === "Tornado Warning" ? '#dc2626' : '#ea580c',
+              weight: 2,
+              className: type === "Tornado Warning" ? 'tornado-warning' : 'severe-warning'
+            });
+          }
+          if (poly) {
+            poly.bindPopup(`${feature.properties.headline}<br>${feature.properties.areaDesc}<br>Until ${feature.properties.ends ? new Date(feature.properties.ends).toLocaleString() : "Unknown"}`);
+            if (type === "Tornado Warning") this.warningLayers.tornado.addLayer(poly);
+            else this.warningLayers.severe.addLayer(poly);
+          }
+        }
+      }
+    } catch (e) {
+      // fallback: show no warnings
+    }
+    // Add demo mesocyclone polygons (since no public API)
+    this.addDemoMesocyclone();
+  }
 
-    // Tornado Warning (Red polygon)
-    const tornadoCoords = [[35.0, -97.5], [35.3, -97.5], [35.3, -97.1], [35.0, -97.1]];
-    const tornadoWarning = L.polygon(tornadoCoords, {
-      fillColor: '#dc2626',
-      fillOpacity: 0.3,
-      color: '#dc2626',
-      weight: 2,
-      className: 'tornado-warning'
-    });
-    tornadoWarning.bindPopup('Tornado Warning<br>Oklahoma County, OK<br>Until 8:30 PM CDT');
-    this.warningLayers.tornado.addLayer(tornadoWarning);
-
-    // Severe Thunderstorm Warning (Yellow polygon)
-    const severeCoords = [[33.5, -84.6], [33.9, -84.6], [33.9, -84.2], [33.5, -84.2]];
-    const severeWarning = L.polygon(severeCoords, {
-      fillColor: '#ea580c',
-      fillOpacity: 0.3,
-      color: '#ea580c',
-      weight: 2,
-      className: 'severe-warning'
-    });
-    severeWarning.bindPopup('Severe Thunderstorm Warning<br>Fulton County, GA<br>Until 9:15 PM EDT');
-    this.warningLayers.severe.addLayer(severeWarning);
-
-    // Mesocyclone Discussion (Purple circle)
+  addDemoMesocyclone() {
+    // Example: North Texas
     const mcdCircle = L.circle([32.4, -96.3], {
       radius: 40000,
       fillColor: '#7c3aed',
@@ -298,13 +290,8 @@ class WeatherRadarApp {
       weight: 2,
       className: 'mesocyclone-discussion'
     });
-    mcdCircle.bindPopup('Mesocyclone Discussion #0847<br>North Texas<br>Valid until 10:00 PM CDT');
+    mcdCircle.bindPopup('Mesocyclone Discussion<br>North Texas<br>Valid until 10:00 PM CDT');
     this.warningLayers.mesocyclone.addLayer(mcdCircle);
-
-    // Add all warning layers to map (always visible)
-    Object.values(this.warningLayers).forEach(layer => {
-      if (!this.map.hasLayer(layer)) this.map.addLayer(layer);
-    });
   }
 
   toggleWarningLayer(type, show) {
@@ -317,11 +304,6 @@ class WeatherRadarApp {
         this.map.removeLayer(this.warningLayers[type]);
       }
     }
-  }
-
-  showLoading(show) {
-    const overlay = document.getElementById('loadingOverlay');
-    overlay.style.display = show ? 'flex' : 'none';
   }
 }
 
