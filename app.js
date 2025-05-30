@@ -255,21 +255,29 @@ class WeatherRadarApp {
   }
 
   selectRadar(site, forceReload = false) {
-    if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
-    this.selectedRadar = site;
-    if (this.radarLayer) {
-      this.map.removeLayer(this.radarLayer);
-      this.radarLayer = null;
-    }
-    // Use Iowa State Mesonet NEXRAD tiles for the site, zoom to site
-    const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
-    this.radarLayer = L.tileLayer(url, {
-      opacity: document.getElementById('opacitySlider').value / 100,
-      zIndex: 200
-    });
-    this.radarLayer.addTo(this.map);
-    this.map.setView([site.lat, site.lon], 8);
+  if (!forceReload && this.selectedRadar && this.selectedRadar.id === site.id) return;
+  this.selectedRadar = site;
+  if (this.radarLayer) {
+    this.map.removeLayer(this.radarLayer);
+    this.radarLayer = null;
   }
+  // Use the Iowa State Mesonet NEXRAD tile layer, but restrict the view around the site
+  const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
+  this.radarLayer = L.tileLayer(url, {
+    opacity: document.getElementById('opacitySlider').value / 100,
+    zIndex: 200
+  });
+  this.radarLayer.addTo(this.map);
+
+  // Calculate a bounding box around the radar site (about 2.5 degrees in lat/lon)
+  const kmToDegrees = 230 / 111.32;
+  const bounds = [
+    [site.lat - kmToDegrees, site.lon - kmToDegrees],
+    [site.lat + kmToDegrees, site.lon + kmToDegrees]
+  ];
+  this.map.fitBounds(bounds, { maxZoom: 9 });
+}
+
 
   calculateRadarBounds(site) {
     const kmToDegrees = 230 / 111.32;
