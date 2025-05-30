@@ -2,14 +2,7 @@
 
 // Radar products and tilts (Level III, common)
 const RADAR_PRODUCTS = [
-  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
-  { id: "NCR", name: "Composite Reflectivity", tilts: [0.5,1.5,2.4,3.4,4.3,6.0,9.9,14.6,19.5] },
-  { id: "N0U", name: "Base Velocity", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
-  { id: "N0S", name: "Storm Relative Motion", tilts: [0.5,0.9,1.3,1.8,2.4,3.1,4.0,5.1,6.4,8.0,10.0,12.5,15.6,19.5] },
-  { id: "NET", name: "Echo Tops", tilts: [0.5] },
-  { id: "NVL", name: "Vertically Integrated Liquid", tilts: [0.5] },
-  { id: "N1P", name: "1-Hour Precipitation", tilts: [0.5] },
-  { id: "NTP", name: "Storm Total Precipitation", tilts: [0.5] }
+  { id: "N0Q", name: "Base Reflectivity", tilts: [0.5] }
 ];
 
 // All 159 NEXRAD sites (abbreviated here, fill out from [5][8][9][10])
@@ -129,7 +122,7 @@ const NEXRAD_SITES = [
 class WeatherRadarApp {
   constructor() {
     this.map = null;
-    this.radarLayer = null; // only one overlay at a time
+    this.radarLayer = null;
     this.warningLayers = {
       tornado: L.layerGroup(),
       severe: L.layerGroup(),
@@ -195,12 +188,8 @@ class WeatherRadarApp {
   populateProductSelect(siteId = null) {
     const select = document.getElementById('productSelect');
     select.innerHTML = '';
-    let available = RADAR_PRODUCTS;
-    if (siteId) {
-      const site = NEXRAD_SITES.find(s => s.id === siteId);
-      if (site && site.products) available = RADAR_PRODUCTS.filter(p => site.products.includes(p.id));
-    }
-    available.forEach(prod => {
+    // For reliability, only show Base Reflectivity for sites
+    RADAR_PRODUCTS.forEach(prod => {
       const option = document.createElement('option');
       option.value = prod.id;
       option.textContent = prod.name;
@@ -255,8 +244,8 @@ class WeatherRadarApp {
       this.map.removeLayer(this.radarLayer);
       this.radarLayer = null;
     }
-    const timestamp = '900913'; // latest timestamp for demo
-    const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-${timestamp}/{z}/{x}/{y}.png`;
+    // Use Open-Meteo for national composite (always CORS-enabled)
+    const url = `https://tile.open-meteo.com/radar/usa/{z}/{x}/{y}.png?frame=11`;
     this.radarLayer = L.tileLayer(url, {
       opacity: document.getElementById('opacitySlider').value / 100,
       zIndex: 200
@@ -272,10 +261,9 @@ class WeatherRadarApp {
       this.map.removeLayer(this.radarLayer);
       this.radarLayer = null;
     }
-    const prod = document.getElementById('productSelect').value || "N0Q";
-    const bounds = this.calculateRadarBounds(site);
-    const url = `https://radar.weather.gov/ridge/RadarImg/${prod}/${site.id}_${prod}_0.png`;
-    this.radarLayer = L.imageOverlay(url, bounds, {
+    // Use Iowa State Mesonet NEXRAD tiles for the site, zoom to site
+    const url = `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png`;
+    this.radarLayer = L.tileLayer(url, {
       opacity: document.getElementById('opacitySlider').value / 100,
       zIndex: 200
     });
